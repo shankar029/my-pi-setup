@@ -1,0 +1,18 @@
+{
+  "lastChangelogVersion": "0.85.1",
+  "defaultProvider": "github-copilot",
+  "defaultModel": "claude-opus-4.8",
+  "defaultThinkingLevel": "medium",
+  "theme": "dark",
+  "packages": [
+    "npm:pi-web-access",
+    "npm:@tintinweb/pi-subagents",
+    "npm:pi-lens",
+    "npm:pi-mcp-adapter",
+    "npm:pi-memory",
+    "npm:pi-background-tasks",
+    "npm:@ff-labs/pi-fff",
+    "npm:@juicesharp/rpiv-todo",
+    "npm:pi-browser-debug"
+  ]
+}
