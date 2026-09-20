@@ -114,8 +114,10 @@ On other machines, `git pull` and re-run the setup script (it's idempotent — s
 
 ## 🧩 Notes & tips
 
-- **Version pinning:** packages in `settings.json` are unversioned, so new machines get the
-  latest of each. For fully reproducible installs, pin versions (e.g. `npm:pi-lens@4.2.1`).
+- **Version pinning:** packages in `settings.json` are **pinned** to exact versions for
+  reproducible installs — every machine gets the identical set. Pinned specs are skipped by
+  `pi update --extensions`/`--all`, so they won't silently drift. To upgrade one, edit its
+  version here (or run `pi install npm:<pkg>@<newversion>`) and re-commit.
 - **Per-project config:** for team-shared setups, pi also reads `.pi/settings.json` committed
   into a project repo — a separate mechanism from this global config.
 - **MCP servers** (`pi-mcp-adapter`) may need their own config and API keys — handle those as

@@ -5,14 +5,14 @@
   "defaultThinkingLevel": "medium",
   "theme": "dark",
   "packages": [
-    "npm:pi-web-access",
-    "npm:@tintinweb/pi-subagents",
-    "npm:pi-lens",
-    "npm:pi-mcp-adapter",
-    "npm:pi-memory",
-    "npm:pi-background-tasks",
-    "npm:@ff-labs/pi-fff",
-    "npm:@juicesharp/rpiv-todo",
-    "npm:pi-browser-debug"
+    "npm:pi-web-access@0.29.0",
+    "npm:@tintinweb/pi-subagents@0.19.0",
+    "npm:pi-lens@4.1.6",
+    "npm:pi-mcp-adapter@2.33.0",
+    "npm:pi-memory@0.4.2",
+    "npm:pi-background-tasks@2.5.0",
+    "npm:@ff-labs/pi-fff@0.10.6",
+    "npm:@juicesharp/rpiv-todo@2.10.0",
+    "npm:pi-browser-debug@2.0.0"
   ]
 }
