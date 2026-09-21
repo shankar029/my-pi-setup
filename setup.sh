@@ -52,7 +52,14 @@ if grep -q "pi-browser-debug" "${PI_DIR}/settings.json"; then
     warn "Playwright Chromium install failed; run 'npx playwright install chromium' manually."
 fi
 
-# ---- 5. done ----------------------------------------------------------
+# ---- 5. bulletproof skill + agent (pinned via its own installer) -----
+BULLETPROOF_REF="${BULLETPROOF_REF:-v0.8.0-rc.2}"
+say "Installing bulletproof (${BULLETPROOF_REF}) — skill + agents…"
+curl -fsSL "https://raw.githubusercontent.com/shankar029/bulletproof/${BULLETPROOF_REF}/install.sh" \
+  | BULLETPROOF_REF="${BULLETPROOF_REF}" sh -s -- pi || \
+  warn "bulletproof install failed; re-run its installer manually."
+
+# ---- 6. done ----------------------------------------------------------
 cat <<'EOF'
 
 ============================================================

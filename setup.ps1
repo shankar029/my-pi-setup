@@ -58,7 +58,15 @@ if (Select-String -Path (Join-Path $PiDir 'settings.json') -Pattern 'pi-browser-
   finally { Pop-Location }
 }
 
-# ---- 5. done ----------------------------------------------------------
+# ---- 5. bulletproof skill + agent (pinned via its own installer) -----
+$BulletproofRef = if ($env:BULLETPROOF_REF) { $env:BULLETPROOF_REF } else { 'v0.8.0-rc.2' }
+Say "Installing bulletproof ($BulletproofRef) - skill + agents..."
+try {
+  $env:BULLETPROOF_REF = $BulletproofRef
+  & ([scriptblock]::Create((irm "https://raw.githubusercontent.com/shankar029/bulletproof/$BulletproofRef/install.ps1"))) pi
+} catch { Warn 'bulletproof install failed; re-run its installer manually.' }
+
+# ---- 6. done ----------------------------------------------------------
 Write-Host @'
 
 ============================================================

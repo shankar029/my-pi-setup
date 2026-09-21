@@ -38,9 +38,11 @@ That's it.
 
 The setup script:
 1. Installs pi globally: `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest`
-2. Copies the portable config from [`agent/`](agent/) into `~/.pi/agent/`
+2. Copies the portable config (`settings.json`) from [`agent/`](agent/) into `~/.pi/agent/`
 3. Runs `pi update --all`, which reads `settings.json` and installs every listed package
 4. Installs the Playwright **Chromium** binary (needed by `pi-browser-debug`)
+5. Installs the **bulletproof** skill + agents via its own pinned installer
+   (`BULLETPROOF_REF`, default `v0.8.0-rc.2`)
 
 ### Packages (from `agent/settings.json`)
 | Package | Purpose |
@@ -56,8 +58,15 @@ The setup script:
 | `pi-browser-debug` | Playwright browser automation — test/debug apps, console, network, JS |
 
 ### Custom resources
-- **Skill:** `bulletproof` — end-to-end production-quality delivery workflow (`/bulletproof <requirement>`)
-- **Prompts & agents:** the `bulletproof` prompt templates and helper agents
+- **Skill + Agent:** `bulletproof` — end-to-end production-quality delivery workflow, installed
+  from [shankar029/bulletproof](https://github.com/shankar029/bulletproof) via its own installer
+  (pinned to `v0.8.0-rc.2`). This version ships **both** the `/bulletproof` skill **and** a
+  drift-proof `bulletproof` agent plus 4 role subagents (`-researcher`, `-design-reviewer`,
+  `-verifier`, `-reviewer`). Not vendored here — the upstream installer is the source of truth,
+  so a new machine always gets the exact pinned release.
+  - Run as skill: `/bulletproof <requirement>` (or `/skill:bulletproof`)
+  - Run as agent: `Agent` tool → `subagent_type: bulletproof`, or
+    `pi --append-system-prompt ~/.pi/agent/prompts/bulletproof.md "<req>"`
 
 ---
 
@@ -70,11 +79,11 @@ my-pi-setup/
 ├── setup.ps1               # Windows installer
 ├── setup.sh                # Linux / macOS installer
 └── agent/                  # portable config → copied to ~/.pi/agent/
-    ├── settings.json       # provider, model, theme, package list
-    ├── skills/bulletproof/ # custom skill
-    ├── prompts/            # prompt templates
-    └── agents/             # custom agents
+    └── settings.json       # provider, model, theme, pinned package list
 ```
+
+> **bulletproof** is intentionally *not* vendored in `agent/`. It's installed on each machine
+> from its upstream repo at a pinned ref, so the skill + agents always match the release.
 
 ---
 
@@ -96,17 +105,16 @@ The following are **git-ignored** and must be regenerated / re-entered per machi
 
 ## 🔄 Updating this setup
 
-After changing packages/skills/settings on your main machine, sync them back into the repo:
+After changing packages/settings on your main machine, sync them back into the repo:
 
 ```bash
 # from the repo root
-cp ~/.pi/agent/settings.json           agent/settings.json
-cp -r ~/.pi/agent/skills/bulletproof   agent/skills/
-cp ~/.pi/agent/prompts/*.md            agent/prompts/
-cp ~/.pi/agent/agents/*.md             agent/agents/ 2>/dev/null || true
-
+cp ~/.pi/agent/settings.json  agent/settings.json
 git add -A && git commit -m "Update pi config" && git push
 ```
+
+To bump **bulletproof**, change `BULLETPROOF_REF` in `setup.sh` / `setup.ps1` (and the README)
+to the new tag, then re-run the setup script on each machine.
 
 On other machines, `git pull` and re-run the setup script (it's idempotent — safe to run repeatedly).
 
@@ -118,10 +126,13 @@ On other machines, `git pull` and re-run the setup script (it's idempotent — s
   reproducible installs — every machine gets the identical set. Pinned specs are skipped by
   `pi update --extensions`/`--all`, so they won't silently drift. To upgrade one, edit its
   version here (or run `pi install npm:<pkg>@<newversion>`) and re-commit.
+- **bulletproof pinning:** the skill+agent is pinned to a **pre-release** (`v0.8.0-rc.2`) because
+  that's the first version shipping the agent. Bump `BULLETPROOF_REF` to `v0.8.0` once it's
+  released as stable.
 - **Per-project config:** for team-shared setups, pi also reads `.pi/settings.json` committed
   into a project repo — a separate mechanism from this global config.
 - **MCP servers** (`pi-mcp-adapter`) may need their own config and API keys — handle those as
   secrets too, not in this repo.
-- The scripts are **idempotent**: they back up any existing `auth.json` and merge (not wipe)
-  your skills/prompts/agents.
+- The scripts are **idempotent**: they back up any existing `auth.json`, and re-running the
+  bulletproof installer simply refreshes the skill + agents in place.
 - **Prerequisite:** Node.js >= 18 and npm must already be installed.
