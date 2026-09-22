@@ -28,7 +28,7 @@ chmod +x setup.sh
 
 Then, on the new machine, authenticate once (secrets are **never** stored in this repo):
 
-```
+```text
 pi
 /login        # log in to your provider (default: github-copilot)
 ```
@@ -98,7 +98,7 @@ installed `agents/bulletproof.md` (it is not shipped by the installer directly).
 
 ## 🗂️ Repo layout
 
-```
+```text
 my-pi-setup/
 ├── README.md
 ├── .gitignore              # keeps secrets & caches out of git
