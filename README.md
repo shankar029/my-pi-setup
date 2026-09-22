@@ -10,6 +10,7 @@ provider defaults, theme, custom skills, prompts, agents, and all installed pack
 ## 🚀 Quick start
 
 ### Windows (PowerShell)
+
 ```powershell
 git clone https://github.com/shankar029/my-pi-setup.git
 cd my-pi-setup
@@ -17,6 +18,7 @@ powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
 ### Linux / macOS (bash)
+
 ```bash
 git clone https://github.com/shankar029/my-pi-setup.git
 cd my-pi-setup
@@ -25,6 +27,7 @@ chmod +x setup.sh
 ```
 
 Then, on the new machine, authenticate once (secrets are **never** stored in this repo):
+
 ```
 pi
 /login        # log in to your provider (default: github-copilot)
@@ -37,16 +40,20 @@ That's it.
 ## 📦 What gets installed
 
 The setup script:
+
 1. Installs pi globally: `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest`
 2. Copies the portable config (`settings.json`) from [`agent/`](agent/) into `~/.pi/agent/`
 3. Runs `pi update --all`, which reads `settings.json` and installs every listed package
 4. Installs the Playwright **Chromium** binary (needed by `pi-browser-debug`)
 5. Installs the **bulletproof** skill + agents via its own pinned installer
    (`BULLETPROOF_REF`, default `v0.8.0-rc.2`)
+6. Generates `bulletproof.system.md` and adds a **`bpi`** shell command to your profile
+   (PowerShell `$PROFILE` on Windows, `~/.bashrc`/`~/.zshrc` on Linux/macOS)
 
 ### Packages (from `agent/settings.json`)
+
 | Package | Purpose |
-|---|---|
+| --- | --- |
 | `pi-web-access` | Web search, URL/PDF/repo/video fetching |
 | `@tintinweb/pi-subagents` | Subagent delegation & workflow orchestration |
 | `pi-lens` | Real-time LSP, linters, formatters, type-checking |
@@ -58,6 +65,7 @@ The setup script:
 | `pi-browser-debug` | Playwright browser automation — test/debug apps, console, network, JS |
 
 ### Custom resources
+
 - **Skill + Agent:** `bulletproof` — end-to-end production-quality delivery workflow, installed
   from [shankar029/bulletproof](https://github.com/shankar029/bulletproof) via its own installer
   (pinned to `v0.8.0-rc.2`). This version ships **both** the `/bulletproof` skill **and** a
@@ -65,8 +73,26 @@ The setup script:
   `-verifier`, `-reviewer`). Not vendored here — the upstream installer is the source of truth,
   so a new machine always gets the exact pinned release.
   - Run as skill: `/bulletproof <requirement>` (or `/skill:bulletproof`)
-  - Run as agent: `Agent` tool → `subagent_type: bulletproof`, or
-    `pi --append-system-prompt ~/.pi/agent/prompts/bulletproof.md "<req>"`
+  - Run as agent (drift-proof): the setup adds a **`bpi`** command —
+    `bpi "<requirement>"`, `bpi -Fast "..."` / `-Full "..."` (PowerShell) or
+    `bpi --fast "..."` / `--full "..."` (bash/zsh). It launches
+    `pi --append-system-prompt ~/.pi/agent/prompts/bulletproof.system.md`.
+  - Or via the `Agent` tool → `subagent_type: bulletproof`.
+
+### The `bpi` command
+
+The setup script wires a `bpi` function into your shell profile so you can run the drift-proof
+bulletproof **agent** without typing the full `--append-system-prompt` line:
+
+| Shell | Usage |
+| --- | --- |
+| PowerShell | `bpi "add rate limiting to /login"` · `bpi -Fast "..."` · `bpi -Full "..."` |
+| bash / zsh | `bpi "add rate limiting to /login"` · `bpi --fast "..."` · `bpi --full "..."` |
+
+`-Fast`/`--fast` forces the inline short path (no subagents); `-Full`/`--full` forces the full
+six-phase loop with delegation. After setup, reload your shell (`. $PROFILE` or
+`source ~/.bashrc`) once before first use. `bulletproof.system.md` is generated from the
+installed `agents/bulletproof.md` (it is not shipped by the installer directly).
 
 ---
 
@@ -92,7 +118,7 @@ my-pi-setup/
 The following are **git-ignored** and must be regenerated / re-entered per machine:
 
 | Excluded | Why | How it's restored |
-|---|---|---|
+| --- | --- | --- |
 | `auth.json` | 🔴 Live OAuth tokens / API keys | Run `/login` after setup |
 | `npm/`, `git/` | Installed package code | `pi update --all` reinstalls from `settings.json` |
 | `bin/` | Downloaded binaries (ripgrep, fd) | pi downloads on demand |
@@ -133,6 +159,7 @@ On other machines, `git pull` and re-run the setup script (it's idempotent — s
   into a project repo — a separate mechanism from this global config.
 - **MCP servers** (`pi-mcp-adapter`) may need their own config and API keys — handle those as
   secrets too, not in this repo.
-- The scripts are **idempotent**: they back up any existing `auth.json`, and re-running the
-  bulletproof installer simply refreshes the skill + agents in place.
+- The scripts are **idempotent**: they back up any existing `auth.json`, re-running the
+  bulletproof installer refreshes the skill + agents in place, and the `bpi` block is added to
+  your shell profile only once (guarded by a marker comment).
 - **Prerequisite:** Node.js >= 18 and npm must already be installed.
