@@ -35,8 +35,14 @@ if (Test-Path $authPath) {
 # settings.json
 Copy-Item (Join-Path $RepoDir 'agent\settings.json') (Join-Path $PiDir 'settings.json') -Force
 
-# skills / prompts / agents / chains (merge, don't wipe)
-foreach ($d in @('skills','prompts','agents','chains')) {
+# pi-fff.json - fff runs in "override" mode so the built-in grep/find tool NAMES
+# resolve to the fast, git-aware fff implementations. Every agent allowlist that
+# already says "grep, find" then gets them with no frontmatter changes.
+$fffSrc = Join-Path $RepoDir 'agent\pi-fff.json'
+if (Test-Path $fffSrc) { Copy-Item $fffSrc (Join-Path $PiDir 'pi-fff.json') -Force }
+
+# skills / prompts / agents / chains / extensions (merge, don't wipe)
+foreach ($d in @('skills','prompts','agents','chains','extensions')) {
   $src = Join-Path $RepoDir "agent\$d"
   if (Test-Path $src) {
     $dst = Join-Path $PiDir $d
@@ -58,8 +64,25 @@ if (Select-String -Path (Join-Path $PiDir 'settings.json') -Pattern 'pi-browser-
   finally { Pop-Location }
 }
 
-# ---- 5. bulletproof skill + agent (pinned via its own installer) -----
-$BulletproofRef = if ($env:BULLETPROOF_REF) { $env:BULLETPROOF_REF } else { 'v0.8.0-rc.2' }
+# ---- 5. bulletproof skill + agent (latest release, prereleases included) -----
+# Resolve the newest published tag rather than pinning. NOTE: /releases/latest is
+# wrong here - it excludes prereleases, so it would return v0.7.0 while v0.8.0-rc.2
+# is current. /releases returns newest-first and includes them.
+# An explicit BULLETPROOF_REF always wins; the network path falls back to main.
+function Resolve-BulletproofRef {
+  if ($env:BULLETPROOF_REF) { return $env:BULLETPROOF_REF }
+  try {
+    $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/shankar029/bulletproof/releases?per_page=1' `
+                             -Headers @{ 'User-Agent' = 'my-pi-setup'; 'Accept' = 'application/vnd.github+json' } `
+                             -TimeoutSec 20
+    $tag = @($rel)[0].tag_name
+    if ($tag) { return $tag }
+  } catch {
+    Warn "Could not resolve the latest bulletproof release ($($_.Exception.Message)); falling back to main."
+  }
+  return 'main'
+}
+$BulletproofRef = Resolve-BulletproofRef
 Say "Installing bulletproof ($BulletproofRef) - skill + agents..."
 try {
   $env:BULLETPROOF_REF = $BulletproofRef

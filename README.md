@@ -42,11 +42,12 @@ That's it.
 The setup script:
 
 1. Installs pi globally: `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest`
-2. Copies the portable config (`settings.json`) from [`agent/`](agent/) into `~/.pi/agent/`
+2. Copies the portable config (`settings.json`, `pi-fff.json`) and the `extensions/` tree from
+   [`agent/`](agent/) into `~/.pi/agent/`
 3. Runs `pi update --all`, which reads `settings.json` and installs every listed package
 4. Installs the Playwright **Chromium** binary (needed by `pi-browser-debug`)
-5. Installs the **bulletproof** skill + agents via its own pinned installer
-   (`BULLETPROOF_REF`, default `v0.8.0-rc.2`)
+5. Installs the **bulletproof** skill + agents via its own installer, resolving the **latest
+   release tag — prereleases included** (override with `BULLETPROOF_REF`)
 6. Generates `bulletproof.system.md` and adds a **`bpi`** shell command to your profile
    (PowerShell `$PROFILE` on Windows, `~/.bashrc`/`~/.zshrc` on Linux/macOS)
 
@@ -66,12 +67,47 @@ The setup script:
 
 ### Custom resources
 
+- **Extension: `search-guard`** — blocks pathological repo-wide shell searches *before they run*
+  and tells the model what to use instead. Lives in
+  [`agent/extensions/search-guard/`](agent/extensions/search-guard/).
+
+  It exists because a subagent researching a ~7.5k-file repo issued
+  `grep -rn "<pattern>" --include=* -l . | grep -v node_modules` — `--include=*` matches every
+  file (including a committed 29MB installer) and the `grep -v` filter runs far too late. It
+  never returned, the per-tool deadline fired at 300s, and the whole research phase was lost.
+  Prompt rules did **not** prevent this: the agent had a working fast `grep` tool, used it
+  successfully earlier in the same run, and shelled out anyway. So this is a hard block.
+
+  | Command | Time on that repo |
+  |---|---|
+  | `grep -rn ... --include=* .` | **>300s, killed** |
+  | `rg` (default) | 32.2s |
+  | `rg -t cs -t ts -t js` | 1.0s |
+  | `rg <subtree>` | 0.3s |
+  | `grep` tool (fff) | instant |
+
+  Blocks `grep -r`/`--recursive`, `--include=*`, `find .`/`find /`, `ls -R`, `dir /s`. Allows
+  `git grep`, non-recursive `grep`, `grep` used as a pipe filter, and `find -maxdepth ≤3`.
+  Escape hatch: append `#allow-slow-search` to the command. Rule logic is dependency-free in
+  `rules.ts` with a 22-case suite — run it with `npx tsx rules.test.mjs`.
+
+- **`pi-fff` in `override` mode** ([`agent/pi-fff.json`](agent/pi-fff.json)) — fff registers
+  itself under the built-in tool names `grep`/`find`/`multi_grep` instead of
+  `ffgrep`/`fffind`. Every agent whose allowlist already says `tools: read, grep, find, ...`
+  silently gets the fast, git-aware, frecency-ranked implementations with **no frontmatter
+  changes** — including subagents you don't control. This is the layer that makes the fast path
+  the *default* path; `search-guard` is the layer that makes the slow path impossible.
+
+  Also worth adding per-repo: an `.ignore` file (ripgrep/fd/fff honour it) excluding committed
+  binaries and build output. On the repo above that alone cut `rg` from 32.2s to 4.1s.
+
 - **Skill + Agent:** `bulletproof` — end-to-end production-quality delivery workflow, installed
   from [shankar029/bulletproof](https://github.com/shankar029/bulletproof) via its own installer
-  (pinned to `v0.8.0-rc.2`). This version ships **both** the `/bulletproof` skill **and** a
+  (resolved to the **latest release tag, prereleases included**). This version ships **both** the
+  `/bulletproof` skill **and** a
   drift-proof `bulletproof` agent plus 4 role subagents (`-researcher`, `-design-reviewer`,
   `-verifier`, `-reviewer`). Not vendored here — the upstream installer is the source of truth,
-  so a new machine always gets the exact pinned release.
+  so a new machine always gets the current release.
   - Run as skill: `/bulletproof <requirement>` (or `/skill:bulletproof`)
   - Run as agent (drift-proof): the setup adds a **`bpi`** command —
     `bpi "<requirement>"`, `bpi -Fast "..."` / `-Full "..."` (PowerShell) or
@@ -105,11 +141,18 @@ my-pi-setup/
 ├── setup.ps1               # Windows installer
 ├── setup.sh                # Linux / macOS installer
 └── agent/                  # portable config → copied to ~/.pi/agent/
-    └── settings.json       # provider, model, theme, pinned package list
+    ├── settings.json       # provider, model, theme, pinned package list
+    ├── pi-fff.json         # fff "override" mode: grep/find ARE the fast tools
+    └── extensions/
+        └── search-guard/   # blocks repo-wide grep -r / find . before they run
+            ├── index.ts        # tool_call hook (thin pi binding)
+            ├── rules.ts        # rule definitions, dependency-free
+            └── rules.test.mjs  # 22 cases: npx tsx rules.test.mjs
 ```
 
 > **bulletproof** is intentionally *not* vendored in `agent/`. It's installed on each machine
-> from its upstream repo at a pinned ref, so the skill + agents always match the release.
+> from its upstream repo at the latest published tag, so the skill + agents always match a
+> real release.
 
 ---
 
@@ -139,8 +182,9 @@ cp ~/.pi/agent/settings.json  agent/settings.json
 git add -A && git commit -m "Update pi config" && git push
 ```
 
-To bump **bulletproof**, change `BULLETPROOF_REF` in `setup.sh` / `setup.ps1` (and the README)
-to the new tag, then re-run the setup script on each machine.
+**bulletproof** needs no bump — the setup resolves the newest published tag on every run.
+Pin a specific one when you need to: `BULLETPROOF_REF=v0.8.0 ./setup.sh`
+(PowerShell: `$env:BULLETPROOF_REF='v0.8.0'; .\setup.ps1`).
 
 On other machines, `git pull` and re-run the setup script (it's idempotent — safe to run repeatedly).
 
@@ -152,9 +196,12 @@ On other machines, `git pull` and re-run the setup script (it's idempotent — s
   reproducible installs — every machine gets the identical set. Pinned specs are skipped by
   `pi update --extensions`/`--all`, so they won't silently drift. To upgrade one, edit its
   version here (or run `pi install npm:<pkg>@<newversion>`) and re-commit.
-- **bulletproof pinning:** the skill+agent is pinned to a **pre-release** (`v0.8.0-rc.2`) because
-  that's the first version shipping the agent. Bump `BULLETPROOF_REF` to `v0.8.0` once it's
-  released as stable.
+- **bulletproof versioning:** *not* pinned — the setup queries the GitHub releases API and takes
+  the newest tag, **including prereleases**, so `rc` builds are picked up as soon as they ship.
+  This deliberately uses `/releases?per_page=1` (newest-first, includes prereleases) rather than
+  `/releases/latest`, which **excludes** prereleases and would currently resolve to `v0.7.0`
+  instead of `v0.8.0-rc.2`. If the API is unreachable or rate-limited it falls back to `main`;
+  set `BULLETPROOF_REF` to pin a specific tag.
 - **Per-project config:** for team-shared setups, pi also reads `.pi/settings.json` committed
   into a project repo — a separate mechanism from this global config.
 - **MCP servers** (`pi-mcp-adapter`) may need their own config and API keys — handle those as

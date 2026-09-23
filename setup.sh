@@ -39,8 +39,15 @@ fi
 # settings.json — merge-safe: only overwrite if repo copy exists
 cp -f "${REPO_DIR}/agent/settings.json" "${PI_DIR}/settings.json"
 
-# skills / prompts / agents / chains — copy (merge, don't wipe)
-for d in skills prompts agents chains; do
+# pi-fff.json — fff runs in "override" mode so the built-in grep/find tool NAMES
+# resolve to the fast, git-aware fff implementations. Every agent allowlist that
+# already says "grep, find" then gets them with no frontmatter changes.
+if [ -f "${REPO_DIR}/agent/pi-fff.json" ]; then
+  cp -f "${REPO_DIR}/agent/pi-fff.json" "${PI_DIR}/pi-fff.json"
+fi
+
+# skills / prompts / agents / chains / extensions — copy (merge, don't wipe)
+for d in skills prompts agents chains extensions; do
   if [ -d "${REPO_DIR}/agent/${d}" ]; then
     mkdir -p "${PI_DIR}/${d}"
     cp -rf "${REPO_DIR}/agent/${d}/." "${PI_DIR}/${d}/"
@@ -58,8 +65,20 @@ if grep -q "pi-browser-debug" "${PI_DIR}/settings.json"; then
     warn "Playwright Chromium install failed; run 'npx playwright install chromium' manually."
 fi
 
-# ---- 5. bulletproof skill + agent (pinned via its own installer) -----
-BULLETPROOF_REF="${BULLETPROOF_REF:-v0.8.0-rc.2}"
+# ---- 5. bulletproof skill + agent (latest release, prereleases included) -----
+# Resolve the newest published tag rather than pinning. NOTE: /releases/latest is
+# wrong here - it excludes prereleases, so it would return v0.7.0 while v0.8.0-rc.2
+# is current. /releases returns newest-first and includes them.
+# An explicit BULLETPROOF_REF always wins; the network path falls back to main.
+resolve_bulletproof_ref() {
+  if [ -n "${BULLETPROOF_REF:-}" ]; then printf '%s' "${BULLETPROOF_REF}"; return; fi
+  _tag=$(curl -fsSL -H 'Accept: application/vnd.github+json' \
+           'https://api.github.com/repos/shankar029/bulletproof/releases?per_page=1' 2>/dev/null |
+         grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 |
+         sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)"/\1/')
+  if [ -n "${_tag}" ]; then printf '%s' "${_tag}"; else printf 'main'; fi
+}
+BULLETPROOF_REF="$(resolve_bulletproof_ref)"
 say "Installing bulletproof (${BULLETPROOF_REF}) — skill + agents…"
 curl -fsSL "https://raw.githubusercontent.com/shankar029/bulletproof/${BULLETPROOF_REF}/install.sh" |
   BULLETPROOF_REF="${BULLETPROOF_REF}" sh -s -- pi ||
