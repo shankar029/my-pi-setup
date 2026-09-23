@@ -23,10 +23,15 @@
  *
  * Escape hatch: append `#allow-slow-search` to the command when a full scan is genuinely
  * intended (e.g. searching ignored or binary files).
+ *
+ * It also fills in a default wall-clock `timeout` on every bash call. pi's bash tool has no
+ * default, so any command that never returns wedges its agent permanently — blocking the four
+ * search patterns we can name does nothing for a locked package cache or a git operation
+ * waiting on credentials. A model-supplied timeout always wins.
  */
 
 import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { blockReason, evaluate } from "./rules.ts";
+import { blockReason, defaultTimeoutSeconds, evaluate } from "./rules.ts";
 
 export default function (pi: ExtensionAPI) {
 	pi.on("tool_call", (event) => {
@@ -36,8 +41,11 @@ export default function (pi: ExtensionAPI) {
 		if (typeof command !== "string" || command.length === 0) return;
 
 		const violated = evaluate(command);
-		if (!violated) return;
+		if (violated) return { block: true, reason: blockReason(violated) };
 
-		return { block: true, reason: blockReason(violated) };
+		// Bound anything the model left unbounded. Never shorten an explicit value.
+		if (typeof event.input.timeout !== "number" || !Number.isFinite(event.input.timeout)) {
+			event.input.timeout = defaultTimeoutSeconds(command);
+		}
 	});
 }
