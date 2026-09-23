@@ -83,3 +83,52 @@ export function blockReason(rule: Rule): string {
 		`If a full scan is genuinely required, re-run with ${ESCAPE_HATCH} appended to the command.`
 	);
 }
+
+// ---------------------------------------------------------------------------
+// Default bash timeouts
+// ---------------------------------------------------------------------------
+//
+// pi's bash tool declares `timeout` as optional with **no default**, so a command that never
+// returns hangs its agent forever: the tool never settles, `tool_execution_end` is never
+// emitted, the child never reaches `agent_end`, and the parent waits indefinitely with no
+// signal. Blocking known-slow search patterns only covers the cases we can name; a locked
+// NuGet cache, a proxied `npm ci`, or a git operation waiting on credentials wedges just as
+// hard and is not pattern-matchable.
+//
+// So every bash call gets a wall-clock bound. A model-supplied `timeout` always wins - this
+// only fills in the blank.
+
+/** Ordinary commands: seconds. */
+export const DEFAULT_TIMEOUT_S = 300;
+
+/** Builds, installs and test suites legitimately run long: seconds. */
+export const LONG_TIMEOUT_S = 1800;
+
+/**
+ * Commands that routinely exceed the ordinary bound. Matching one raises the ceiling rather
+ * than removing it - an 1800s failure is still recoverable, an unbounded hang is not.
+ */
+const LONG_RUNNING = new RegExp(
+	[
+		// package managers
+		`${B}(?:npm|pnpm|yarn|bun)\\s+(?:ci|install|i|add|update|run\\s+\\S+)\\b`,
+		`${B}(?:pip|pip3|poetry|uv)\\s+(?:install|sync|add)\\b`,
+		`${B}(?:nuget|dotnet)\\s+restore\\b`,
+		// builds
+		`${B}dotnet\\s+(?:build|publish|test|pack)\\b`,
+		`${B}(?:msbuild|cargo|gradle|gradlew|mvn|make|cmake|ninja|bazel|tsc|webpack|vite)\\b`,
+		// test runners
+		`${B}(?:pytest|vitest|jest|mocha|playwright|cypress|ctest|go\\s+test)\\b`,
+		// containers / browsers
+		`${B}docker\\s+(?:build|compose)\\b`,
+		`${B}npx\\s+playwright\\s+install\\b`,
+		// the project's own idle-timeout runner already bounds itself
+		`${B}python\\s+\\S*run\\.py\\b`,
+	].join("|"),
+	"i",
+);
+
+/** Wall-clock bound in seconds for a bash command that did not specify one. */
+export function defaultTimeoutSeconds(command: string): number {
+	return LONG_RUNNING.test(command) ? LONG_TIMEOUT_S : DEFAULT_TIMEOUT_S;
+}

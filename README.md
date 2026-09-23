@@ -89,7 +89,17 @@ The setup script:
   Blocks `grep -r`/`--recursive`, `--include=*`, `find .`/`find /`, `ls -R`, `dir /s`. Allows
   `git grep`, non-recursive `grep`, `grep` used as a pipe filter, and `find -maxdepth ≤3`.
   Escape hatch: append `#allow-slow-search` to the command. Rule logic is dependency-free in
-  `rules.ts` with a 22-case suite — run it with `npx tsx rules.test.mjs`.
+  `rules.ts` with a 35-case suite — run it with `npx tsx rules.test.mjs`.
+
+  **It also bounds every bash call.** pi's `bash` tool declares `timeout` as optional with *no
+  default*, so any command that never returns wedges its agent permanently: the tool never
+  settles, `tool_execution_end` never fires, the child never reaches `agent_end`, and the parent
+  waits forever with no signal. Blocking the search patterns we can name does nothing for a
+  locked NuGet cache, a proxied `npm ci`, or a git operation waiting on credentials. So the hook
+  fills in a wall-clock bound when the model didn't supply one — **300s** ordinarily, **1800s**
+  for builds, installs and test suites (`npm ci`, `dotnet build|test`, `pytest`, `playwright`,
+  `docker build`, …). An explicit model-supplied `timeout` always wins. Verified live: an
+  unbounded `sleep 600` is now killed at 300s instead of hanging.
 
 - **`pi-fff` in `override` mode** ([`agent/pi-fff.json`](agent/pi-fff.json)) — fff registers
   itself under the built-in tool names `grep`/`find`/`multi_grep` instead of
@@ -145,9 +155,9 @@ my-pi-setup/
     ├── pi-fff.json         # fff "override" mode: grep/find ARE the fast tools
     └── extensions/
         └── search-guard/   # blocks repo-wide grep -r / find . before they run
-            ├── index.ts        # tool_call hook (thin pi binding)
-            ├── rules.ts        # rule definitions, dependency-free
-            └── rules.test.mjs  # 22 cases: npx tsx rules.test.mjs
+            ├── index.ts        # tool_call hook: block slow scans + bound every bash call
+            ├── rules.ts        # rule definitions + default timeouts, dependency-free
+            └── rules.test.mjs  # 35 cases: npx tsx rules.test.mjs
 ```
 
 > **bulletproof** is intentionally *not* vendored in `agent/`. It's installed on each machine

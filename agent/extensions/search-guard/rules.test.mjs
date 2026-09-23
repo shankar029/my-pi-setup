@@ -1,4 +1,4 @@
-import { evaluate } from "./rules.ts";
+import { DEFAULT_TIMEOUT_S, LONG_TIMEOUT_S, defaultTimeoutSeconds, evaluate } from "./rules.ts";
 
 const cases = [
   // [command, shouldBlock, note]
@@ -36,5 +36,32 @@ for (const [cmd, expect, note] of cases) {
   ok ? pass++ : fail++;
   console.log(`${ok ? "PASS" : "FAIL"}  blocked=${String(blocked).padEnd(5)} want=${String(expect).padEnd(5)} ${(r?.id ?? "-").padEnd(22)} ${note}`);
 }
+// --- default bash timeouts -------------------------------------------------
+const timeoutCases = [
+  // [command, expected seconds, note]
+  ['rg -t cs "ActionId"', DEFAULT_TIMEOUT_S, "ordinary command"],
+  ['git log --oneline -1', DEFAULT_TIMEOUT_S, "git log"],
+  ['cat foo.txt', DEFAULT_TIMEOUT_S, "cat"],
+  ['npm ci', LONG_TIMEOUT_S, "npm ci"],
+  ['npm run build', LONG_TIMEOUT_S, "npm run build"],
+  ['dotnet build', LONG_TIMEOUT_S, "dotnet build"],
+  ['dotnet test --no-build', LONG_TIMEOUT_S, "dotnet test"],
+  ['cd src && dotnet restore', LONG_TIMEOUT_S, "after separator"],
+  ['npx playwright install chromium', LONG_TIMEOUT_S, "playwright install"],
+  ['pytest -q', LONG_TIMEOUT_S, "pytest"],
+  ['python scripts/run.py --idle 60 -- npm test', LONG_TIMEOUT_S, "idle runner"],
+  ['docker build .', LONG_TIMEOUT_S, "docker build"],
+  // Not an over-match: the quote before `npm` is not a command boundary, so this correctly
+  // gets the ordinary bound. (Contrast the block rules, where `find` after a space inside a
+  // quoted string does match and is accepted as an over-block.)
+  ['echo "npm ci is what I would run"', DEFAULT_TIMEOUT_S, "quoted: correctly not treated as a build"],
+];
+for (const [cmd, want, note] of timeoutCases) {
+  const got = defaultTimeoutSeconds(cmd);
+  const ok = got === want;
+  ok ? pass++ : fail++;
+  console.log(`${ok ? "PASS" : "FAIL"}  timeout=${String(got).padEnd(6)} want=${String(want).padEnd(6)} ${"".padEnd(17)} ${note}`);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
