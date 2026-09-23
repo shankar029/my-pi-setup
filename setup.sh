@@ -39,8 +39,15 @@ fi
 # settings.json — merge-safe: only overwrite if repo copy exists
 cp -f "${REPO_DIR}/agent/settings.json" "${PI_DIR}/settings.json"
 
-# skills / prompts / agents / chains — copy (merge, don't wipe)
-for d in skills prompts agents chains; do
+# pi-fff.json — fff runs in "override" mode so the built-in grep/find tool NAMES
+# resolve to the fast, git-aware fff implementations. Every agent allowlist that
+# already says "grep, find" then gets them with no frontmatter changes.
+if [ -f "${REPO_DIR}/agent/pi-fff.json" ]; then
+  cp -f "${REPO_DIR}/agent/pi-fff.json" "${PI_DIR}/pi-fff.json"
+fi
+
+# skills / prompts / agents / chains / extensions — copy (merge, don't wipe)
+for d in skills prompts agents chains extensions; do
   if [ -d "${REPO_DIR}/agent/${d}" ]; then
     mkdir -p "${PI_DIR}/${d}"
     cp -rf "${REPO_DIR}/agent/${d}/." "${PI_DIR}/${d}/"

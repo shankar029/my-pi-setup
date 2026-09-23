@@ -35,8 +35,14 @@ if (Test-Path $authPath) {
 # settings.json
 Copy-Item (Join-Path $RepoDir 'agent\settings.json') (Join-Path $PiDir 'settings.json') -Force
 
-# skills / prompts / agents / chains (merge, don't wipe)
-foreach ($d in @('skills','prompts','agents','chains')) {
+# pi-fff.json - fff runs in "override" mode so the built-in grep/find tool NAMES
+# resolve to the fast, git-aware fff implementations. Every agent allowlist that
+# already says "grep, find" then gets them with no frontmatter changes.
+$fffSrc = Join-Path $RepoDir 'agent\pi-fff.json'
+if (Test-Path $fffSrc) { Copy-Item $fffSrc (Join-Path $PiDir 'pi-fff.json') -Force }
+
+# skills / prompts / agents / chains / extensions (merge, don't wipe)
+foreach ($d in @('skills','prompts','agents','chains','extensions')) {
   $src = Join-Path $RepoDir "agent\$d"
   if (Test-Path $src) {
     $dst = Join-Path $PiDir $d

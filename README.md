@@ -42,7 +42,8 @@ That's it.
 The setup script:
 
 1. Installs pi globally: `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest`
-2. Copies the portable config (`settings.json`) from [`agent/`](agent/) into `~/.pi/agent/`
+2. Copies the portable config (`settings.json`, `pi-fff.json`) and the `extensions/` tree from
+   [`agent/`](agent/) into `~/.pi/agent/`
 3. Runs `pi update --all`, which reads `settings.json` and installs every listed package
 4. Installs the Playwright **Chromium** binary (needed by `pi-browser-debug`)
 5. Installs the **bulletproof** skill + agents via its own pinned installer
@@ -65,6 +66,40 @@ The setup script:
 | `pi-browser-debug` | Playwright browser automation — test/debug apps, console, network, JS |
 
 ### Custom resources
+
+- **Extension: `search-guard`** — blocks pathological repo-wide shell searches *before they run*
+  and tells the model what to use instead. Lives in
+  [`agent/extensions/search-guard/`](agent/extensions/search-guard/).
+
+  It exists because a subagent researching a ~7.5k-file repo issued
+  `grep -rn "<pattern>" --include=* -l . | grep -v node_modules` — `--include=*` matches every
+  file (including a committed 29MB installer) and the `grep -v` filter runs far too late. It
+  never returned, the per-tool deadline fired at 300s, and the whole research phase was lost.
+  Prompt rules did **not** prevent this: the agent had a working fast `grep` tool, used it
+  successfully earlier in the same run, and shelled out anyway. So this is a hard block.
+
+  | Command | Time on that repo |
+  |---|---|
+  | `grep -rn ... --include=* .` | **>300s, killed** |
+  | `rg` (default) | 32.2s |
+  | `rg -t cs -t ts -t js` | 1.0s |
+  | `rg <subtree>` | 0.3s |
+  | `grep` tool (fff) | instant |
+
+  Blocks `grep -r`/`--recursive`, `--include=*`, `find .`/`find /`, `ls -R`, `dir /s`. Allows
+  `git grep`, non-recursive `grep`, `grep` used as a pipe filter, and `find -maxdepth ≤3`.
+  Escape hatch: append `#allow-slow-search` to the command. Rule logic is dependency-free in
+  `rules.ts` with a 22-case suite — run it with `npx tsx rules.test.mjs`.
+
+- **`pi-fff` in `override` mode** ([`agent/pi-fff.json`](agent/pi-fff.json)) — fff registers
+  itself under the built-in tool names `grep`/`find`/`multi_grep` instead of
+  `ffgrep`/`fffind`. Every agent whose allowlist already says `tools: read, grep, find, ...`
+  silently gets the fast, git-aware, frecency-ranked implementations with **no frontmatter
+  changes** — including subagents you don't control. This is the layer that makes the fast path
+  the *default* path; `search-guard` is the layer that makes the slow path impossible.
+
+  Also worth adding per-repo: an `.ignore` file (ripgrep/fd/fff honour it) excluding committed
+  binaries and build output. On the repo above that alone cut `rg` from 32.2s to 4.1s.
 
 - **Skill + Agent:** `bulletproof` — end-to-end production-quality delivery workflow, installed
   from [shankar029/bulletproof](https://github.com/shankar029/bulletproof) via its own installer
@@ -105,7 +140,13 @@ my-pi-setup/
 ├── setup.ps1               # Windows installer
 ├── setup.sh                # Linux / macOS installer
 └── agent/                  # portable config → copied to ~/.pi/agent/
-    └── settings.json       # provider, model, theme, pinned package list
+    ├── settings.json       # provider, model, theme, pinned package list
+    ├── pi-fff.json         # fff "override" mode: grep/find ARE the fast tools
+    └── extensions/
+        └── search-guard/   # blocks repo-wide grep -r / find . before they run
+            ├── index.ts        # tool_call hook (thin pi binding)
+            ├── rules.ts        # rule definitions, dependency-free
+            └── rules.test.mjs  # 22 cases: npx tsx rules.test.mjs
 ```
 
 > **bulletproof** is intentionally *not* vendored in `agent/`. It's installed on each machine
