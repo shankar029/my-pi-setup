@@ -65,8 +65,20 @@ if grep -q "pi-browser-debug" "${PI_DIR}/settings.json"; then
     warn "Playwright Chromium install failed; run 'npx playwright install chromium' manually."
 fi
 
-# ---- 5. bulletproof skill + agent (pinned via its own installer) -----
-BULLETPROOF_REF="${BULLETPROOF_REF:-v0.8.0-rc.2}"
+# ---- 5. bulletproof skill + agent (latest release, prereleases included) -----
+# Resolve the newest published tag rather than pinning. NOTE: /releases/latest is
+# wrong here - it excludes prereleases, so it would return v0.7.0 while v0.8.0-rc.2
+# is current. /releases returns newest-first and includes them.
+# An explicit BULLETPROOF_REF always wins; the network path falls back to main.
+resolve_bulletproof_ref() {
+  if [ -n "${BULLETPROOF_REF:-}" ]; then printf '%s' "${BULLETPROOF_REF}"; return; fi
+  _tag=$(curl -fsSL -H 'Accept: application/vnd.github+json' \
+           'https://api.github.com/repos/shankar029/bulletproof/releases?per_page=1' 2>/dev/null |
+         grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 |
+         sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)"/\1/')
+  if [ -n "${_tag}" ]; then printf '%s' "${_tag}"; else printf 'main'; fi
+}
+BULLETPROOF_REF="$(resolve_bulletproof_ref)"
 say "Installing bulletproof (${BULLETPROOF_REF}) — skill + agents…"
 curl -fsSL "https://raw.githubusercontent.com/shankar029/bulletproof/${BULLETPROOF_REF}/install.sh" |
   BULLETPROOF_REF="${BULLETPROOF_REF}" sh -s -- pi ||

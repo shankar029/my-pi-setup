@@ -46,8 +46,8 @@ The setup script:
    [`agent/`](agent/) into `~/.pi/agent/`
 3. Runs `pi update --all`, which reads `settings.json` and installs every listed package
 4. Installs the Playwright **Chromium** binary (needed by `pi-browser-debug`)
-5. Installs the **bulletproof** skill + agents via its own pinned installer
-   (`BULLETPROOF_REF`, default `v0.8.0-rc.2`)
+5. Installs the **bulletproof** skill + agents via its own installer, resolving the **latest
+   release tag — prereleases included** (override with `BULLETPROOF_REF`)
 6. Generates `bulletproof.system.md` and adds a **`bpi`** shell command to your profile
    (PowerShell `$PROFILE` on Windows, `~/.bashrc`/`~/.zshrc` on Linux/macOS)
 
@@ -103,10 +103,11 @@ The setup script:
 
 - **Skill + Agent:** `bulletproof` — end-to-end production-quality delivery workflow, installed
   from [shankar029/bulletproof](https://github.com/shankar029/bulletproof) via its own installer
-  (pinned to `v0.8.0-rc.2`). This version ships **both** the `/bulletproof` skill **and** a
+  (resolved to the **latest release tag, prereleases included**). This version ships **both** the
+  `/bulletproof` skill **and** a
   drift-proof `bulletproof` agent plus 4 role subagents (`-researcher`, `-design-reviewer`,
   `-verifier`, `-reviewer`). Not vendored here — the upstream installer is the source of truth,
-  so a new machine always gets the exact pinned release.
+  so a new machine always gets the current release.
   - Run as skill: `/bulletproof <requirement>` (or `/skill:bulletproof`)
   - Run as agent (drift-proof): the setup adds a **`bpi`** command —
     `bpi "<requirement>"`, `bpi -Fast "..."` / `-Full "..."` (PowerShell) or
@@ -150,7 +151,8 @@ my-pi-setup/
 ```
 
 > **bulletproof** is intentionally *not* vendored in `agent/`. It's installed on each machine
-> from its upstream repo at a pinned ref, so the skill + agents always match the release.
+> from its upstream repo at the latest published tag, so the skill + agents always match a
+> real release.
 
 ---
 
@@ -180,8 +182,9 @@ cp ~/.pi/agent/settings.json  agent/settings.json
 git add -A && git commit -m "Update pi config" && git push
 ```
 
-To bump **bulletproof**, change `BULLETPROOF_REF` in `setup.sh` / `setup.ps1` (and the README)
-to the new tag, then re-run the setup script on each machine.
+**bulletproof** needs no bump — the setup resolves the newest published tag on every run.
+Pin a specific one when you need to: `BULLETPROOF_REF=v0.8.0 ./setup.sh`
+(PowerShell: `$env:BULLETPROOF_REF='v0.8.0'; .\setup.ps1`).
 
 On other machines, `git pull` and re-run the setup script (it's idempotent — safe to run repeatedly).
 
@@ -193,9 +196,12 @@ On other machines, `git pull` and re-run the setup script (it's idempotent — s
   reproducible installs — every machine gets the identical set. Pinned specs are skipped by
   `pi update --extensions`/`--all`, so they won't silently drift. To upgrade one, edit its
   version here (or run `pi install npm:<pkg>@<newversion>`) and re-commit.
-- **bulletproof pinning:** the skill+agent is pinned to a **pre-release** (`v0.8.0-rc.2`) because
-  that's the first version shipping the agent. Bump `BULLETPROOF_REF` to `v0.8.0` once it's
-  released as stable.
+- **bulletproof versioning:** *not* pinned — the setup queries the GitHub releases API and takes
+  the newest tag, **including prereleases**, so `rc` builds are picked up as soon as they ship.
+  This deliberately uses `/releases?per_page=1` (newest-first, includes prereleases) rather than
+  `/releases/latest`, which **excludes** prereleases and would currently resolve to `v0.7.0`
+  instead of `v0.8.0-rc.2`. If the API is unreachable or rate-limited it falls back to `main`;
+  set `BULLETPROOF_REF` to pin a specific tag.
 - **Per-project config:** for team-shared setups, pi also reads `.pi/settings.json` committed
   into a project repo — a separate mechanism from this global config.
 - **MCP servers** (`pi-mcp-adapter`) may need their own config and API keys — handle those as
