@@ -51,6 +51,10 @@ const timeoutCases = [
   ['pytest -q', LONG_TIMEOUT_S, "pytest"],
   ['python scripts/run.py --idle 60 -- npm test', LONG_TIMEOUT_S, "idle runner"],
   ['docker build .', LONG_TIMEOUT_S, "docker build"],
+  ['agent-browser install', LONG_TIMEOUT_S, "agent-browser install (downloads Chrome)"],
+  ['agent-browser install --with-deps', LONG_TIMEOUT_S, "agent-browser install --with-deps"],
+  ['agent-browser navigate http://localhost:5173', DEFAULT_TIMEOUT_S, "agent-browser drive stays bounded"],
+  ['agent-browser snapshot', DEFAULT_TIMEOUT_S, "agent-browser snapshot stays bounded"],
   // Not an over-match: the quote before `npm` is not a command boundary, so this correctly
   // gets the ordinary bound. (Contrast the block rules, where `find` after a space inside a
   // quoted string does match and is accepted as an over-block.)

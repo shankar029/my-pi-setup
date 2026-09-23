@@ -122,6 +122,10 @@ const LONG_RUNNING = new RegExp(
 		// containers / browsers
 		`${B}docker\\s+(?:build|compose)\\b`,
 		`${B}npx\\s+playwright\\s+install\\b`,
+		// agent-browser downloads Chrome for Testing on first run; everything else it does
+		// (navigate, snapshot, click) is sub-second and keeps the ordinary bound, which is what
+		// stops a wedged browser daemon from hanging a verification run.
+		`${B}agent-browser\\s+install\\b`,
 		// the project's own idle-timeout runner already bounds itself
 		`${B}python\\s+\\S*run\\.py\\b`,
 	].join("|"),
